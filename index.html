@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#08090B" />
+    <meta name="description" content="ALMOST VISIBLE — an encounter with the imperceptible. An interactive instrument where attention creates visibility." />
+    <title>ALMOST VISIBLE</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2308090B'/%3E%3Ccircle cx='8' cy='8' r='1.2' fill='%23F2F0EA'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="stage" aria-label="A dark field of faint particles that responds to pointer movement, revealing a translucent generative form." role="img"></canvas>
+
+      <div id="ui">
+        <header class="mark">
+          <h1>Almost Visible</h1>
+          <p>An encounter with the imperceptible.</p>
+        </header>
+
+        <div class="index" aria-live="polite">
+          <span id="state-num">00</span><span class="slash">/</span><span id="state-name">ABSENCE</span>
+        </div>
+
+        <div class="caption" id="caption">
+          <p class="kicker" id="kicker">A field of possibility</p>
+          <p class="line" id="line">There is more here than you can see.</p>
+          <p class="hint" id="hint">Move to perceive.</p>
+        </div>
+
+        <div class="readout" aria-hidden="true">
+          <canvas id="wave" width="240" height="48"></canvas>
+          <dl>
+            <div><dt>ε energy</dt><dd id="r-e">0.000</dd></div>
+            <div><dt>κ coherence</dt><dd id="r-c">0.000</dd></div>
+            <div><dt>μ memory</dt><dd id="r-m">0.000</dd></div>
+            <div><dt>z depth</dt><dd id="r-z">7.20</dd></div>
+          </dl>
+        </div>
+
+        <nav class="controls" aria-label="Controls">
+          <button type="button" id="c-sound" aria-pressed="false">Sound <i>Off</i></button>
+          <button type="button" id="c-reset">Reset</button>
+          <button type="button" id="c-about" aria-haspopup="dialog">About</button>
+          <button type="button" id="c-full">Fullscreen</button>
+        </nav>
+
+        <div class="reticle" id="reticle" aria-hidden="true"><i></i><span id="reticle-label"></span></div>
+      </div>
+
+      <section id="about" role="dialog" aria-modal="true" aria-labelledby="about-title" hidden>
+        <div class="about-inner">
+          <p class="kicker">About</p>
+          <h2 id="about-title">Attention creates visibility.</h2>
+          <p>
+            This is an instrument rather than a picture. A form is always present in the dark, but it has no colour and
+            no surface of its own. It can only borrow light from the way you look at it.
+          </p>
+          <p>
+            Move slowly and the field condenses. Hold, and attention concentrates. Move quickly and it scatters. Stop,
+            and what you saw dissolves, though the path you took remains for a while.
+          </p>
+          <dl class="keys">
+            <div><dt>Move</dt><dd>disturb the field</dd></div>
+            <div><dt>Hold · Space</dt><dd>focus attention</dd></div>
+            <div><dt>Scroll · Pinch · ↑↓</dt><dd>travel through depth</dd></div>
+            <div><dt>Drag · ←→</dt><dd>turn the observer</dd></div>
+          </dl>
+          <p class="fine">Everything is generated in real time. No recordings, no images, no stored data.</p>
+          <button type="button" id="about-close">Close</button>
+        </div>
+      </section>
+
+      <div id="veil" aria-hidden="true"></div>
+
+      <div id="fallback" hidden>
+        <div class="fallback-art" aria-hidden="true"></div>
+        <div class="fallback-text">
+          <h2>Almost Visible</h2>
+          <p>An encounter with the imperceptible.</p>
+          <p class="fine" id="fallback-reason">
+            This work is drawn in real time with WebGL, which is unavailable in this browser. What you see is a still
+            trace of it. Not everything that disappears is gone.
+          </p>
+        </div>
+      </div>
+    </div>
+    <noscript>
+      <p style="color:#AEB6BC;font:12px/1.6 Helvetica,Arial,sans-serif;letter-spacing:.08em;padding:8vw">
+        ALMOST VISIBLE is a real-time work and needs JavaScript to appear.
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,484 @@
+:root {
+  --obsidian: #08090b;
+  --white: #f2f0ea;
+  --silver: #aeb6bc;
+  --violet: #a693ff;
+  --cyan: #8ce5ea;
+  --amber: #e8bd8b;
+  --sans: 'Helvetica Neue', 'Neue Haas Grotesk Text Pro', 'Neue Haas Unica', Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  --m: clamp(20px, 3.4vw, 52px);
+  --e: 0;
+  --c: 0;
+  --k: 0;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--obsidian);
+  color: var(--white);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  overscroll-behavior: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  outline: none;
+}
+
+/* ── type as part of the space ─────────────────────────────────────── */
+
+#ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0;
+  transition: opacity 3.2s ease 0.4s;
+}
+#ui.ready {
+  opacity: 1;
+}
+
+.mark {
+  position: absolute;
+  top: calc(var(--m) + env(safe-area-inset-top));
+  left: var(--m);
+}
+.mark h1 {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  /* the title's own spacing breathes with coherence */
+  letter-spacing: calc(0.34em + var(--c) * 0.14em);
+  color: var(--white);
+  opacity: calc(0.72 + var(--c) * 0.28);
+  transition: letter-spacing 1.2s linear;
+}
+.mark p {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--silver);
+  opacity: 0.62;
+}
+
+.index {
+  position: absolute;
+  top: calc(var(--m) + env(safe-area-inset-top));
+  right: var(--m);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--silver);
+  display: flex;
+  gap: 0.9em;
+  transition: opacity 0.9s ease;
+}
+.index .slash {
+  opacity: 0.4;
+}
+.index #state-name {
+  color: var(--white);
+}
+
+.caption {
+  position: absolute;
+  left: var(--m);
+  bottom: calc(var(--m) + 132px);
+  max-width: min(30ch, 78vw);
+  transition: opacity 0.9s ease, transform 2.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* the caption drifts very slightly against the pointer: parallax, not layout */
+  transform: translate3d(calc(var(--px, 0) * -6px), calc(var(--py, 0) * 4px), 0);
+}
+.caption.out,
+.index.out {
+  opacity: 0;
+}
+.kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--silver);
+  opacity: 0.7;
+}
+.kicker::before {
+  content: '';
+  display: inline-block;
+  width: calc(14px + var(--e) * 26px);
+  height: 1px;
+  margin-right: 12px;
+  vertical-align: middle;
+  background: currentColor;
+  opacity: 0.7;
+  transition: width 0.8s ease;
+}
+.line {
+  margin-top: 18px;
+  font-size: clamp(22px, 2.5vw, 38px);
+  font-weight: 300;
+  line-height: 1.14;
+  letter-spacing: -0.018em;
+  color: var(--white);
+  opacity: calc(0.6 + var(--e) * 0.25 + var(--c) * 0.15);
+  text-wrap: balance;
+}
+.hint {
+  margin-top: 20px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--silver);
+  opacity: 0;
+  transition: opacity 2.4s ease;
+}
+.hint.show {
+  opacity: 0.85;
+  animation: breathe 5.5s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.readout {
+  position: absolute;
+  left: var(--m);
+  bottom: calc(var(--m) + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--silver);
+  opacity: calc(0.34 + var(--e) * 0.4);
+}
+.readout canvas {
+  width: 120px;
+  height: 24px;
+  display: block;
+}
+.readout dl {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 4px 26px;
+}
+.readout dt {
+  opacity: 0.55;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.readout dd {
+  margin-top: 5px;
+  color: var(--white);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── controls: words, not widgets ──────────────────────────────────── */
+
+.controls {
+  position: absolute;
+  right: var(--m);
+  bottom: calc(var(--m) + env(safe-area-inset-bottom));
+  display: flex;
+  gap: clamp(16px, 2.2vw, 34px);
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity 1.6s ease;
+}
+#ui.idle .controls {
+  opacity: 0.3;
+}
+#ui.idle .controls:hover,
+#ui.idle .controls:focus-within {
+  opacity: 1;
+  transition-duration: 0.3s;
+}
+button {
+  appearance: none;
+  background: none;
+  border: 0;
+  color: var(--silver);
+  font: 500 10px/1 var(--sans);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  padding: 12px 0;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.4s ease;
+}
+button::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0.24em;
+  bottom: 6px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+button:hover,
+button:focus-visible {
+  color: var(--white);
+  outline: none;
+}
+button:hover::after,
+button:focus-visible::after {
+  transform: scaleX(1);
+}
+button i {
+  font-style: normal;
+  opacity: 0.5;
+  margin-left: 0.5em;
+}
+button[aria-pressed='true'] i {
+  opacity: 1;
+  color: var(--white);
+}
+
+/* ── reticle: a scientific annotation that follows attention ───────── */
+
+.reticle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform, opacity;
+  opacity: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--silver);
+  white-space: pre;
+}
+.reticle i {
+  position: absolute;
+  left: 14px;
+  top: -0.5px;
+  width: calc(10px + var(--k) * 26px);
+  height: 1px;
+  background: var(--silver);
+  opacity: 0.8;
+}
+.reticle i::before {
+  content: '';
+  position: absolute;
+  left: -14.5px;
+  top: -14px;
+  width: 1px;
+  height: 8px;
+  background: var(--silver);
+  box-shadow: 0 20px 0 var(--silver);
+  opacity: 0.6;
+}
+.reticle span {
+  position: absolute;
+  left: calc(32px + var(--k) * 26px);
+  top: -5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── about ─────────────────────────────────────────────────────────── */
+
+#about {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  padding: var(--m);
+  background: rgba(8, 9, 11, 0.78);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  overflow: auto;
+}
+#about[hidden] {
+  display: none;
+}
+#about.open {
+  opacity: 1;
+}
+.about-inner {
+  max-width: 52ch;
+  margin-left: clamp(0px, 12vw, 220px);
+}
+#about h2 {
+  margin: 22px 0 28px;
+  font-size: clamp(26px, 3.4vw, 46px);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+}
+#about p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--silver);
+  margin-bottom: 16px;
+  max-width: 46ch;
+}
+#about .keys {
+  margin: 30px 0;
+  border-top: 1px solid rgba(174, 182, 188, 0.18);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+#about .keys div {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(174, 182, 188, 0.18);
+}
+#about .keys dt {
+  color: var(--white);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 10px;
+}
+#about .keys dd {
+  color: var(--silver);
+  text-align: right;
+}
+.fine {
+  font-size: 11px !important;
+  opacity: 0.6;
+  letter-spacing: 0.03em;
+}
+
+#veil {
+  position: absolute;
+  inset: 0;
+  background: var(--obsidian);
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 3.6s ease;
+}
+#veil.clear {
+  opacity: 0;
+}
+#veil.quick {
+  transition-duration: 0.7s;
+}
+
+/* ── static fallback ───────────────────────────────────────────────── */
+
+#fallback {
+  position: absolute;
+  inset: 0;
+  background: var(--obsidian);
+}
+#fallback[hidden] {
+  display: none;
+}
+.fallback-art {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 38% 30% at 58% 46%, rgba(166, 147, 255, 0.07), transparent 70%),
+    radial-gradient(ellipse 22% 34% at 54% 50%, rgba(140, 229, 234, 0.05), transparent 70%),
+    radial-gradient(ellipse 24vmin 36vmin at 53% 49%, transparent 98.4%, rgba(242, 240, 234, 0.15) 99.2%, transparent 100%),
+    radial-gradient(ellipse 40vmin 22vmin at 61% 45%, transparent 98.6%, rgba(174, 182, 188, 0.1) 99.3%, transparent 100%),
+    radial-gradient(ellipse 15vmin 27vmin at 57% 52%, transparent 98%, rgba(166, 147, 255, 0.1) 99%, transparent 100%),
+    radial-gradient(circle at 50% 50%, #0d0f13, var(--obsidian) 70%);
+}
+.fallback-text {
+  position: absolute;
+  left: var(--m);
+  bottom: var(--m);
+  max-width: 44ch;
+}
+.fallback-text h2 {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+.fallback-text p {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--silver);
+}
+
+/* ── small screens ─────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .readout dl {
+    display: none;
+  }
+  .caption {
+    bottom: calc(var(--m) + 96px + env(safe-area-inset-bottom));
+  }
+  .controls {
+    left: var(--m);
+    right: var(--m);
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .readout {
+    bottom: calc(var(--m) + 52px + env(safe-area-inset-bottom));
+  }
+  .mark p {
+    display: none;
+  }
+  .reticle span {
+    display: none;
+  }
+  button {
+    padding: 16px 0;
+  }
+}
+@media (max-height: 520px) {
+  .caption {
+    bottom: calc(var(--m) + 70px);
+  }
+  .line {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint.show {
+    animation: none;
+  }
+  .caption {
+    transform: none;
+  }
+  * {
+    transition-duration: 0.01s !important;
+  }
+}
