@@ -3,91 +3,98 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#08090B" />
-    <meta name="description" content="ALMOST VISIBLE — an encounter with the imperceptible. An interactive instrument where attention creates visibility." />
+    <meta name="theme-color" content="#050506" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="ALMOST VISIBLE — an encounter with the imperceptible. A five-minute interactive journey in which sound reveals form." />
     <title>ALMOST VISIBLE</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2308090B'/%3E%3Ccircle cx='8' cy='8' r='1.2' fill='%23F2F0EA'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23050506'/%3E%3Cellipse cx='8' cy='8' rx='5' ry='2' fill='none' stroke='%23F2EFE8' stroke-width='.6'/%3E%3C/svg%3E" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #050506;
+        color: #f2efe8;
+      }
+    </style>
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app">
-      <canvas id="stage" aria-label="A dark field of faint particles that responds to pointer movement, revealing a translucent generative form." role="img"></canvas>
+      <canvas
+        id="stage"
+        tabindex="0"
+        role="application"
+        aria-label="Almost Visible. An interactive field of sound and glass-like matter."
+        aria-describedby="stage-help"
+      ></canvas>
+      <i class="stage-focus" aria-hidden="true"></i>
+      <p id="stage-help" class="sr-only">
+        Tab moves between the objects in the field. Arrow keys move the focused object, W and S move it further or nearer, Q and E
+        turn it, Enter or Space strikes it. M mutes, P pauses, R restarts.
+      </p>
 
-      <div id="ui">
-        <header class="mark">
-          <h1>Almost Visible</h1>
-          <p>An encounter with the imperceptible.</p>
-        </header>
+      <div id="ui" data-state="title">
+        <p class="mark" aria-hidden="true">Almost Visible</p>
 
-        <div class="index" aria-live="polite">
-          <span id="state-num">00</span><span class="slash">/</span><span id="state-name">ABSENCE</span>
+        <p class="chapter" id="chapter">
+          <span class="numeral" id="chapter-numeral"></span><i class="rule" aria-hidden="true"></i><span class="name" id="chapter-name"></span>
+        </p>
+
+        <div class="caption" id="caption" aria-live="polite">
+          <p class="line" id="line"></p>
+          <p class="hint" id="hint"></p>
         </div>
 
-        <div class="caption" id="caption">
-          <p class="kicker" id="kicker">A field of possibility</p>
-          <p class="line" id="line">There is more here than you can see.</p>
-          <p class="hint" id="hint">Move to perceive.</p>
-        </div>
+        <p class="sound-caption" id="sound-caption" aria-hidden="true"></p>
 
-        <div class="readout" aria-hidden="true">
-          <canvas id="wave" width="240" height="48"></canvas>
-          <dl>
-            <div><dt>ε energy</dt><dd id="r-e">0.000</dd></div>
-            <div><dt>κ coherence</dt><dd id="r-c">0.000</dd></div>
-            <div><dt>μ memory</dt><dd id="r-m">0.000</dd></div>
-            <div><dt>z depth</dt><dd id="r-z">7.20</dd></div>
-          </dl>
-        </div>
-
-        <nav class="controls" aria-label="Controls">
-          <button type="button" id="c-sound" aria-pressed="false">Sound <i>Off</i></button>
-          <button type="button" id="c-reset">Reset</button>
-          <button type="button" id="c-about" aria-haspopup="dialog">About</button>
-          <button type="button" id="c-full">Fullscreen</button>
+        <nav class="controls" id="controls" aria-label="Controls">
+          <button type="button" id="control-sound" aria-label="Mute sound" aria-keyshortcuts="M">Sound</button>
+          <button type="button" id="control-pause" aria-label="Pause" aria-keyshortcuts="P">Pause</button>
+          <button type="button" id="control-restart" aria-label="Restart from the beginning" aria-keyshortcuts="R">Restart</button>
         </nav>
 
-        <div class="reticle" id="reticle" aria-hidden="true"><i></i><span id="reticle-label"></span></div>
+        <div class="timeline" id="timeline" role="progressbar" aria-label="Journey" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <i></i>
+        </div>
       </div>
 
-      <section id="about" role="dialog" aria-modal="true" aria-labelledby="about-title" hidden>
-        <div class="about-inner">
-          <p class="kicker">About</p>
-          <h2 id="about-title">Attention creates visibility.</h2>
-          <p>
-            This is an instrument rather than a picture. A form is always present in the dark, but it has no colour and
-            no surface of its own. It can only borrow light from the way you look at it.
-          </p>
-          <p>
-            Move slowly and the field condenses. Hold, and attention concentrates. Move quickly and it scatters. Stop,
-            and what you saw dissolves, though the path you took remains for a while.
-          </p>
-          <dl class="keys">
-            <div><dt>Move</dt><dd>disturb the field</dd></div>
-            <div><dt>Hold · Space</dt><dd>focus attention</dd></div>
-            <div><dt>Scroll · Pinch · ↑↓</dt><dd>travel through depth</dd></div>
-            <div><dt>Drag · ←→</dt><dd>turn the observer</dd></div>
-          </dl>
-          <p class="fine">Everything is generated in real time. No recordings, no images, no stored data.</p>
-          <button type="button" id="about-close">Close</button>
+      <section class="card" id="title" aria-labelledby="title-heading">
+        <h1 class="card-mark" id="title-heading">Almost Visible</h1>
+        <div class="card-body">
+          <p class="statement">An encounter with the imperceptible.</p>
+          <button type="button" class="enter" id="begin"><span>Begin</span></button>
+          <p class="note">Sound on. Headphones recommended.</p>
         </div>
       </section>
 
-      <div id="veil" aria-hidden="true"></div>
+      <section class="card" id="ending" aria-labelledby="ending-heading" hidden>
+        <h2 class="card-mark" id="ending-heading">Almost Visible</h2>
+        <div class="card-body">
+          <p class="statement">An encounter with the imperceptible.</p>
+          <button type="button" class="enter" id="reenter"><span>Reenter</span></button>
+        </div>
+      </section>
+
+      <div id="live" class="sr-only" role="status" aria-live="polite"></div>
 
       <div id="fallback" hidden>
-        <div class="fallback-art" aria-hidden="true"></div>
-        <div class="fallback-text">
-          <h2>Almost Visible</h2>
-          <p>An encounter with the imperceptible.</p>
-          <p class="fine" id="fallback-reason">
-            This work is drawn in real time with WebGL, which is unavailable in this browser. What you see is a still
-            trace of it. Not everything that disappears is gone.
+        <div class="fallback-art" aria-hidden="true">
+          <i style="--i: 0"></i><i style="--i: 1"></i><i style="--i: 2"></i><i style="--i: 3"></i><i style="--i: 4"></i><i style="--i: 5"></i>
+          <i style="--i: 6"></i><i style="--i: 7"></i><i style="--i: 8"></i><i style="--i: 9"></i><i style="--i: 10"></i><i style="--i: 11"></i>
+        </div>
+        <h2 class="card-mark">Almost Visible</h2>
+        <div class="card-body">
+          <p class="statement">An encounter with the imperceptible.</p>
+          <p class="note" id="fallback-reason">
+            This work is drawn and sounded in real time with WebGL, which is unavailable in this browser. What remains is a still
+            trace of it: sheets of glass, waiting for a sound.
           </p>
         </div>
       </div>
     </div>
     <noscript>
-      <p style="color:#AEB6BC;font:12px/1.6 Helvetica,Arial,sans-serif;letter-spacing:.08em;padding:8vw">
-        ALMOST VISIBLE is a real-time work and needs JavaScript to appear.
+      <p style="position:fixed;z-index:9;left:0;right:0;bottom:0;margin:0;padding:8vw;color:#A9AFB5;background:#050506;font:300 13px/1.6 'Helvetica Neue',Helvetica,Arial,sans-serif;letter-spacing:.04em">
+        ALMOST VISIBLE is drawn and sounded in real time. It needs JavaScript to appear.
       </p>
     </noscript>
     <script type="module" src="/src/main.ts"></script>

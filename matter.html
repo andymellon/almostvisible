@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex" />
+    <title>Resonant Matter — material proof</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      #matter {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+        cursor: crosshair;
+        outline: none;
+      }
+      #legend {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        margin: 0;
+        padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+        color: rgba(242, 239, 232, 0.34);
+        font: 300 10.5px/1.5 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: pre-wrap;
+        pointer-events: none;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="matter" tabindex="0" aria-label="Resonant Matter: sheets of glass shaped by interfering waves. Click to strike."></canvas>
+    <p id="legend" aria-hidden="true"></p>
+    <script type="module" src="/src/proof/matter.ts"></script>
+  </body>
+</html>

@@ -1,175 +1,389 @@
-import type { Sound } from '../audio/Sound';
-import type { Input } from '../interaction/Input';
-import { STATES, type Perception } from '../state/Perception';
-import type { World } from '../scene/World';
+/**
+ * Interface — the typographic layer. Markup lives in index.html, appearance in style.css;
+ * this module only moves text in and out and reports the visitor's three decisions.
+ *
+ * States (data-state on #ui): title → journey → ending → journey …
+ * The title card is the audio-unlock gesture: a click anywhere on it, or Enter / Space,
+ * calls handlers.onBegin() synchronously inside the event.
+ *
+ * Nothing here reads layout per frame. update() writes two custom properties at ~10 Hz
+ * (--amp, --stab) and they only drive opacity / transform.
+ */
+import type { Bridge, UI, UIHandlers } from '../core/contracts';
 
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const sign = (v: number) => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(2);
+type State = 'title' | 'journey' | 'ending';
+
+/** UI plus teardown (optional extra; the contract is unchanged). */
+export interface StageUI extends UI {
+  dispose(): void;
+}
+
+const IDLE_SECONDS = 3.5;
+const ANNOUNCE_SECONDS = 4.2;
+const BREATHE_INTERVAL = 0.1;
+
+function el<T extends HTMLElement = HTMLElement>(id: string): T {
+  const node = document.getElementById(id);
+  if (!node) throw new Error(`Interface: #${id} is missing from index.html`);
+  return node as T;
+}
 
 /**
- * The almost-invisible interface. Typography reads the same perceptual model
- * as the shaders (via CSS custom properties), so it belongs to the organism.
+ * Show the static composition instead of the live piece (no WebGL, ?static, context lost).
+ * Safe to call at any time, with or without an Interface.
  */
-export class Interface {
-  private ui = $('ui');
-  private caption = $('caption');
-  private index = document.querySelector<HTMLElement>('.index')!;
-  private reticle = $('reticle');
-  private reticleLabel = $('reticle-label');
-  private hint = $('hint');
-  private about = $('about');
-  private veil = $('veil');
-  private wave = $<HTMLCanvasElement>('wave');
-  private wctx = this.wave.getContext('2d');
-  private buf = new Float32Array(1024);
-  private rE = $('r-e');
-  private rC = $('r-c');
-  private rM = $('r-m');
-  private rZ = $('r-z');
-  private shown = 0;
-  private slow = 0;
-  private swapTimer = 0;
-  private lastFocus: HTMLElement | null = null;
-
-  constructor(private sound: Sound, private onReset: () => void) {
-    const bSound = $<HTMLButtonElement>('c-sound');
-    const bFull = $<HTMLButtonElement>('c-full');
-
-    if (!sound.supported) bSound.hidden = true;
-    bSound.addEventListener('click', async () => {
-      const on = await sound.toggle();
-      bSound.setAttribute('aria-pressed', String(on));
-      bSound.querySelector('i')!.textContent = on ? 'On' : 'Off';
-    });
-
-    $('c-reset').addEventListener('click', () => {
-      this.veil.classList.add('quick');
-      this.veil.classList.remove('clear');
-      window.setTimeout(() => {
-        this.onReset();
-        this.veil.classList.remove('quick');
-        this.veil.classList.add('clear');
-      }, 750);
-    });
-
-    $('c-about').addEventListener('click', () => this.toggleAbout(true));
-    $('about-close').addEventListener('click', () => this.toggleAbout(false));
-    this.about.addEventListener('click', (e) => e.target === this.about && this.toggleAbout(false));
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !this.about.hidden) this.toggleAbout(false);
-    });
-
-    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
-    if (!root.requestFullscreen && !root.webkitRequestFullscreen) bFull.hidden = true;
-    bFull.addEventListener('click', () => {
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-      else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
-      else root.webkitRequestFullscreen?.();
-    });
-    document.addEventListener('fullscreenchange', () => {
-      bFull.textContent = document.fullscreenElement ? 'Exit' : 'Fullscreen';
-    });
-
-    requestAnimationFrame(() => {
-      this.ui.classList.add('ready');
-      this.veil.classList.add('clear');
-      this.hint.classList.add('show');
-    });
+export function showFallback(reason?: string): void {
+  const app = document.getElementById('app');
+  const fallback = document.getElementById('fallback');
+  if (!fallback) return;
+  if (reason) {
+    const text = document.getElementById('fallback-reason');
+    if (text) text.textContent = reason;
   }
+  app?.classList.add('is-fallback');
+  fallback.hidden = false;
+}
 
-  get aboutOpen() {
-    return !this.about.hidden;
-  }
+export function createInterface(handlers: UIHandlers): StageUI {
+  const root = el('ui');
+  const chapterEl = el('chapter');
+  const numeralEl = el('chapter-numeral');
+  const nameEl = el('chapter-name');
+  const lineEl = el('line');
+  const hintEl = el('hint');
+  const soundCaption = el('sound-caption');
+  const soundButton = el<HTMLButtonElement>('control-sound');
+  const pauseButton = el<HTMLButtonElement>('control-pause');
+  const restartButton = el<HTMLButtonElement>('control-restart');
+  const timeline = el('timeline');
+  const titleCard = el('title');
+  const endingCard = el('ending');
+  const reenterButton = el<HTMLButtonElement>('reenter');
+  const live = el('live');
 
-  private toggleAbout(open: boolean) {
-    if (open) {
-      this.lastFocus = document.activeElement as HTMLElement;
-      this.about.hidden = false;
-      requestAnimationFrame(() => this.about.classList.add('open'));
-      $('about-close').focus();
-    } else {
-      this.about.classList.remove('open');
-      window.setTimeout(() => (this.about.hidden = true), 700);
-      this.lastFocus?.focus();
-    }
-  }
+  const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** Must not be shorter than --fade-out in style.css. */
+  const outMs = reduced ? 320 : 920;
 
-  private setState(i: number) {
-    this.shown = i;
-    const s = STATES[i];
-    this.caption.classList.add('out');
-    this.index.classList.add('out');
-    window.clearTimeout(this.swapTimer);
-    this.swapTimer = window.setTimeout(() => {
-      $('state-num').textContent = s.num;
-      $('state-name').textContent = s.name;
-      $('kicker').textContent = s.kicker;
-      $('line').textContent = s.line;
-      this.caption.classList.remove('out');
-      this.index.classList.remove('out');
-    }, 950);
-  }
+  let state: State = 'title';
+  let muted = false;
+  let paused = false;
+  let idleT = 0;
+  let idle = false;
+  let announceT = 0;
+  let breatheT = 0;
+  let lastAmp = -1;
+  let lastStab = -1;
+  let lastProgress = -1;
+  let lastPercent = -1;
+  let titleTimer = 0;
+  let endingTimer = 0;
+  let liveTimer = 0;
+  let disposed = false;
 
-  update(dt: number, p: Perception, inp: Input, world: World) {
-    if (p.state !== this.shown) this.setState(p.state);
+  const setState = (next: State) => {
+    state = next;
+    root.dataset.state = next;
+  };
 
-    // the reticle follows the point of attention every frame (transform only)
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const rx = world.focusU * w;
-    const ry = (1 - world.focusV) * h;
-    this.reticle.style.transform = `translate3d(${rx.toFixed(1)}px,${ry.toFixed(1)}px,0)`;
-    this.reticle.style.opacity = inp.touched ? Math.min(0.75, p.energy * 1.4 + p.hold * 0.5).toFixed(3) : '0';
-
-    this.slow += dt;
-    if (this.slow < 0.1) return;
-    this.slow = 0;
-
-    const st = this.ui.style;
-    st.setProperty('--e', p.energy.toFixed(3));
-    st.setProperty('--c', p.coherence.toFixed(3));
-    st.setProperty('--k', p.hold.toFixed(3));
-    st.setProperty('--px', inp.x.toFixed(3));
-    st.setProperty('--py', inp.y.toFixed(3));
-    this.ui.classList.toggle('idle', inp.idle > 4);
-    this.hint.classList.toggle('show', p.state === 0 && p.attention < 0.03);
-
-    this.rE.textContent = p.energy.toFixed(3);
-    this.rC.textContent = p.coherence.toFixed(3);
-    this.rM.textContent = p.memory.toFixed(3);
-    this.rZ.textContent = world.dist.toFixed(2);
-    const f = world.focus;
-    this.reticleLabel.textContent = `x ${sign(f.x)}  y ${sign(f.y)}  z ${sign(f.z)}\nψ ${p.attention.toFixed(3)}`;
-
-    this.drawWave(p);
-  }
-
-  /** A barely audible vibration becomes a visible waveform. */
-  private drawWave(p: Perception) {
-    const c = this.wctx;
-    if (!c) return;
-    const W = this.wave.width;
-    const H = this.wave.height;
-    c.clearRect(0, 0, W, H);
-    c.strokeStyle = '#AEB6BC';
-    c.lineWidth = 1.5;
-    c.beginPath();
-    const live = this.sound.enabled && this.sound.analyser;
-    if (live) this.sound.analyser!.getFloatTimeDomainData(this.buf);
-    const n = 96;
-    for (let i = 0; i < n; i++) {
-      const u = i / (n - 1);
-      let v: number;
-      if (live) v = this.buf[i * 8] * 5;
-      else {
-        // silent: the same signal, only drawn
-        const env = Math.sin(u * Math.PI);
-        v = env * (Math.sin(u * 14 + p.time * 1.3) * (0.05 + 0.3 * p.energy) + Math.sin(u * 47 - p.time * 2.1) * 0.22 * p.coherence + Math.sin(u * 5 + p.time * 0.4) * 0.3 * p.hold);
+  /**
+   * Text that is never swapped abruptly: the old line leaves, then the new one arrives.
+   * `write` puts the content in the DOM while the element is invisible.
+   */
+  function fader(target: HTMLElement, write: (text: string) => void): (text: string) => void {
+    target.classList.add('fade');
+    let shown = '';
+    let visible = false;
+    let pending: string | null = null;
+    let timer = 0;
+    const apply = () => {
+      timer = 0;
+      target.classList.remove('out');
+      const text = pending;
+      pending = null;
+      if (!text) return;
+      write(text);
+      void target.offsetWidth; // one reflow per text change: arms the transition from the hidden state
+      target.classList.add('in');
+      shown = text;
+      visible = true;
+    };
+    return (text: string) => {
+      if (pending === null ? text === shown : text === pending) return;
+      pending = text;
+      if (visible) {
+        visible = false;
+        shown = '';
+        target.classList.remove('in');
+        target.classList.add('out');
+        timer = window.setTimeout(apply, outMs);
+      } else if (!timer) {
+        apply();
       }
-      const y = H / 2 - Math.max(-1, Math.min(1, v)) * (H / 2 - 2);
-      if (i === 0) c.moveTo(0, y);
-      else c.lineTo(u * W, y);
-    }
-    c.stroke();
+    };
   }
+
+  let chapterNumeral = '';
+  let chapterName = '';
+  const setChapter = fader(chapterEl, () => {
+    numeralEl.textContent = chapterNumeral;
+    nameEl.textContent = chapterName;
+  });
+  const setLine = fader(lineEl, (text) => {
+    lineEl.textContent = text;
+  });
+  const setHint = fader(hintEl, (text) => {
+    hintEl.textContent = text;
+  });
+
+  /** Polite screen-reader message; cleared first so a repeated text is spoken again. */
+  function speak(text: string): void {
+    window.clearTimeout(liveTimer);
+    live.textContent = '';
+    liveTimer = window.setTimeout(() => {
+      live.textContent = text;
+    }, 60);
+  }
+
+  function wake(): void {
+    idleT = 0;
+    if (idle) {
+      idle = false;
+      root.classList.remove('idle');
+    }
+  }
+
+  function begin(): void {
+    if (state !== 'title' || disposed) return;
+    ui.showTitle(false);
+    handlers.onBegin();
+  }
+
+  function toggleMute(): void {
+    const next = !muted;
+    ui.setMuted(next);
+    handlers.onMute(next);
+    speak(next ? 'Sound muted' : 'Sound on');
+  }
+
+  function togglePause(): void {
+    const next = !paused;
+    ui.setPaused(next);
+    handlers.onPause(next);
+    speak(next ? 'Paused' : 'Resumed');
+  }
+
+  function restart(): void {
+    handlers.onRestart();
+    speak('Restarting from the beginning');
+  }
+
+  function reenter(): void {
+    if (state !== 'ending') return;
+    ui.showEnding(false);
+    handlers.onReenter();
+  }
+
+  function onKeyDown(ev: KeyboardEvent): void {
+    wake();
+    if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.repeat) return;
+    const target = ev.target as HTMLElement | null;
+    const onButton = !!target && (target.tagName === 'BUTTON' || target.tagName === 'A');
+    if (state === 'title') {
+      // A focused button turns Enter / Space into its own click, which reaches the card.
+      if ((ev.key === 'Enter' || ev.key === ' ') && !onButton) {
+        ev.preventDefault();
+        begin();
+      }
+      return;
+    }
+    if (state !== 'journey') return;
+    switch (ev.key) {
+      case 'm':
+      case 'M':
+        toggleMute();
+        break;
+      case 'p':
+      case 'P':
+        togglePause();
+        break;
+      case 'r':
+      case 'R':
+        restart();
+        break;
+      default:
+        break;
+    }
+  }
+
+  const onTitleClick = () => begin();
+  const onSoundClick = () => toggleMute();
+  const onPauseClick = () => togglePause();
+  const onRestartClick = () => restart();
+  const onReenterClick = () => reenter();
+
+  titleCard.addEventListener('click', onTitleClick);
+  soundButton.addEventListener('click', onSoundClick);
+  pauseButton.addEventListener('click', onPauseClick);
+  restartButton.addEventListener('click', onRestartClick);
+  reenterButton.addEventListener('click', onReenterClick);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('pointermove', wake, { passive: true });
+  window.addEventListener('pointerdown', wake, { passive: true });
+  window.addEventListener('focusin', wake);
+
+  const ui: StageUI = {
+    chapter(numeral: string, name: string) {
+      if (!numeral && !name) {
+        setChapter('');
+        return;
+      }
+      chapterNumeral = numeral;
+      chapterName = name;
+      setChapter(`${numeral} ${name}`);
+      speak(`Chapter ${numeral}. ${name}.`);
+    },
+
+    caption(text: string) {
+      setLine(text);
+    },
+
+    hint(text: string | null) {
+      setHint(text ?? '');
+    },
+
+    announce(text: string) {
+      const plain = text
+        .trim()
+        .replace(/^\[\s*/, '')
+        .replace(/\s*\]$/, '');
+      if (!plain) return;
+      speak(plain);
+      soundCaption.textContent = `[ ${plain} ]`;
+      soundCaption.classList.add('in');
+      announceT = ANNOUNCE_SECONDS;
+    },
+
+    progress(t: number) {
+      const p = t > 0 ? (t < 1 ? t : 1) : 0;
+      if (p === lastProgress) return;
+      // 0.1 % steps are plenty for a hairline; the two ends are always written exactly.
+      if (Math.abs(p - lastProgress) < 0.001 && p > 0 && p < 1) return;
+      lastProgress = p;
+      timeline.style.setProperty('--p', p.toFixed(4));
+      const percent = Math.round(p * 100);
+      if (percent !== lastPercent) {
+        lastPercent = percent;
+        timeline.setAttribute('aria-valuenow', String(percent));
+      }
+    },
+
+    showTitle(visible: boolean) {
+      window.clearTimeout(titleTimer);
+      if (visible) {
+        titleCard.hidden = false;
+        void titleCard.offsetWidth;
+        titleCard.classList.remove('out');
+        setState('title');
+        return;
+      }
+      if (titleCard.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+      titleCard.classList.add('out');
+      titleTimer = window.setTimeout(
+        () => {
+          titleCard.hidden = true;
+        },
+        reduced ? 400 : 1900,
+      );
+      if (state === 'title') setState('journey');
+      wake();
+    },
+
+    showEnding(visible: boolean) {
+      if (visible === (state === 'ending')) return;
+      window.clearTimeout(endingTimer);
+      if (visible) {
+        setState('ending');
+        endingCard.hidden = false;
+        void endingCard.offsetWidth;
+        endingCard.classList.add('in');
+        reenterButton.focus({ preventScroll: true });
+        speak('The piece has ended. Reenter to begin again with a new harmony.');
+        return;
+      }
+      if (endingCard.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+      endingCard.classList.remove('in');
+      endingTimer = window.setTimeout(
+        () => {
+          endingCard.hidden = true;
+        },
+        reduced ? 400 : 2700,
+      );
+      setState(titleCard.hidden || titleCard.classList.contains('out') ? 'journey' : 'title');
+      wake();
+    },
+
+    setMuted(m: boolean) {
+      if (m === muted) return;
+      muted = m;
+      soundButton.textContent = m ? 'Muted' : 'Sound';
+      soundButton.setAttribute('aria-label', m ? 'Unmute sound' : 'Mute sound');
+    },
+
+    setPaused(p: boolean) {
+      if (p === paused) return;
+      paused = p;
+      pauseButton.textContent = p ? 'Resume' : 'Pause';
+      pauseButton.setAttribute('aria-label', p ? 'Resume' : 'Pause');
+      // update() is not called while paused: keep the controls plainly visible.
+      root.classList.toggle('paused', p);
+      wake();
+    },
+
+    update(dt: number, bridge: Bridge) {
+      idleT += dt;
+      if (!idle && idleT > IDLE_SECONDS) {
+        idle = true;
+        root.classList.add('idle');
+      }
+
+      if (announceT > 0) {
+        announceT -= dt;
+        if (announceT <= 0) soundCaption.classList.remove('in');
+      }
+
+      breatheT += dt;
+      if (breatheT >= BREATHE_INTERVAL) {
+        breatheT = 0;
+        const amp = Math.round(Math.min(1, Math.max(0, bridge.amplitude)) * 50) / 50;
+        const stab = Math.round(Math.min(1, Math.max(0, bridge.stability)) * 50) / 50;
+        if (amp !== lastAmp) {
+          lastAmp = amp;
+          root.style.setProperty('--amp', String(amp));
+        }
+        if (stab !== lastStab) {
+          lastStab = stab;
+          root.style.setProperty('--stab', String(stab));
+        }
+      }
+    },
+
+    dispose() {
+      disposed = true;
+      window.clearTimeout(titleTimer);
+      window.clearTimeout(endingTimer);
+      window.clearTimeout(liveTimer);
+      titleCard.removeEventListener('click', onTitleClick);
+      soundButton.removeEventListener('click', onSoundClick);
+      pauseButton.removeEventListener('click', onPauseClick);
+      restartButton.removeEventListener('click', onRestartClick);
+      reenterButton.removeEventListener('click', onReenterClick);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('pointermove', wake);
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('focusin', wake);
+    },
+  };
+
+  return ui;
 }
